@@ -449,12 +449,30 @@
 
                 // Display audio if available
                 if (audioData) {
+                    const binaryString = atob(audioData);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    const magicBytes = bytes.slice(0, 4);
+                    let blob;
+                    
+                    // Detect format from magic bytes
+                    if (magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46) {
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    } else if (magicBytes[0] === 0xFF && magicBytes[1] === 0xFB) {
+                        blob = new Blob([bytes], { type: 'audio/mpeg' });
+                    } else if (magicBytes[0] === 0x4F && magicBytes[1] === 0x67 && magicBytes[2] === 0x67 && magicBytes[3] === 0x53) {
+                        blob = new Blob([bytes], { type: 'audio/ogg' });
+                    } else {
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
                     audioContainer.innerHTML = `
                         <audio controls style="width: 100%;">
-                            <source src="data:audio/wav;base64,${audioData}" type="audio/wav">
-                            <source src="data:audio/mpeg;base64,${audioData}" type="audio/mpeg">
-                            <source src="data:audio/ogg;base64,${audioData}" type="audio/ogg">
-                            <source src="data:audio/webm;base64,${audioData}" type="audio/webm">
+                            <source src="${url}" type="${blob.type}">
                             Your browser does not support the audio element.
                         </audio>
                     `;
@@ -501,13 +519,7 @@
                 html += `<div class="result-section">
                     <div class="result-title">🎵 Text-to-Speech Audio</div>
                     <div class="audio-player">
-                        <audio controls>
-                            <source src="data:audio/wav;base64,${data.ttsAudio}" type="audio/wav">
-                            <source src="data:audio/mpeg;base64,${data.ttsAudio}" type="audio/mpeg">
-                            <source src="data:audio/ogg;base64,${data.ttsAudio}" type="audio/ogg">
-                            <source src="data:audio/webm;base64,${data.ttsAudio}" type="audio/webm">
-                            Your browser does not support the audio element.
-                        </audio>
+                        <audio id="audioPlayer_tts" controls style="width: 100%;"></audio>
                     </div>
                 </div>`;
             }
@@ -518,19 +530,54 @@
                 data.ttsAudios.forEach((audio, index) => {
                     html += `<div class="audio-player">
                         <strong>Audio ${index + 1}</strong>
-                        <audio controls>
-                            <source src="data:audio/wav;base64,${audio}" type="audio/wav">
-                            <source src="data:audio/mpeg;base64,${audio}" type="audio/mpeg">
-                            <source src="data:audio/ogg;base64,${audio}" type="audio/ogg">
-                            <source src="data:audio/webm;base64,${audio}" type="audio/webm">
-                            Your browser does not support the audio element.
-                        </audio>
+                        <audio id="audioPlayer_${index}" controls style="width: 100%;"></audio>
                     </div>`;
                 });
                 html += '</div>';
             }
 
             resultsDiv.innerHTML = html;
+
+            // Load audio files after DOM is ready
+            setTimeout(() => {
+                function playAudio(base64, elementId) {
+                    const binaryString = atob(base64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    const magicBytes = bytes.slice(0, 4);
+                    let blob;
+                    
+                    // Detect format from magic bytes
+                    if (magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46) {
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    } else if (magicBytes[0] === 0xFF && magicBytes[1] === 0xFB) {
+                        blob = new Blob([bytes], { type: 'audio/mpeg' });
+                    } else if (magicBytes[0] === 0x4F && magicBytes[1] === 0x67 && magicBytes[2] === 0x67 && magicBytes[3] === 0x53) {
+                        blob = new Blob([bytes], { type: 'audio/ogg' });
+                    } else {
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
+                    const player = document.getElementById(elementId);
+                    if (player) {
+                        player.src = url;
+                    }
+                }
+
+                if (data.ttsAudio) {
+                    playAudio(data.ttsAudio, 'audioPlayer_tts');
+                }
+
+                if (data.ttsAudios && Array.isArray(data.ttsAudios)) {
+                    data.ttsAudios.forEach((audio, index) => {
+                        playAudio(audio, `audioPlayer_${index}`);
+                    });
+                }
+            }, 100);
         }
 
         function displayAudioResults(data) {
@@ -550,13 +597,7 @@
                 html += `<div class="result-section">
                     <div class="result-title">🎵 Combined Audio (Base64)</div>
                     <div class="audio-player">
-                        <audio controls>
-                            <source src="data:audio/wav;base64,${data.ttsBase64}" type="audio/wav">
-                            <source src="data:audio/mpeg;base64,${data.ttsBase64}" type="audio/mpeg">
-                            <source src="data:audio/ogg;base64,${data.ttsBase64}" type="audio/ogg">
-                            <source src="data:audio/webm;base64,${data.ttsBase64}" type="audio/webm">
-                            Your browser does not support the audio element.
-                        </audio>
+                        <audio id="audioPlayer" controls style="width: 100%;"></audio>
                     </div>
                     <details style="margin-top: 10px;">
                         <summary style="cursor: pointer; color: #667eea; font-weight: 600;">📋 View Base64 String</summary>
@@ -565,6 +606,36 @@
                         </div>
                     </details>
                 </div>`;
+
+                // Set audio source after DOM is ready
+                setTimeout(() => {
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    const binaryString = atob(data.ttsBase64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    // Try different MIME types
+                    const mimeTypes = ['audio/wav', 'audio/mpeg', 'audio/ogg', 'audio/webm', 'audio/mp4'];
+                    let blob;
+                    
+                    // Try to detect format from magic bytes
+                    const magicBytes = bytes.slice(0, 4);
+                    if (magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46) {
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    } else if (magicBytes[0] === 0xFF && magicBytes[1] === 0xFB) {
+                        blob = new Blob([bytes], { type: 'audio/mpeg' });
+                    } else if (magicBytes[0] === 0x4F && magicBytes[1] === 0x67 && magicBytes[2] === 0x67 && magicBytes[3] === 0x53) {
+                        blob = new Blob([bytes], { type: 'audio/ogg' });
+                    } else {
+                        // Default to WAV
+                        blob = new Blob([bytes], { type: 'audio/wav' });
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
+                    audioPlayer.src = url;
+                }, 100);
             }
 
             resultsDiv.innerHTML = html;
