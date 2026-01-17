@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STT-TTS API Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input[type="file"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: #764ba2;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-submit {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-submit:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-clear {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .result-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .result-title {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .result-content {
+            color: #555;
+            font-size: 13px;
+            word-break: break-all;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            line-height: 1.6;
+        }
+
+        .audio-player {
+            margin-top: 15px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 10px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .stream-events {
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .event {
+            padding: 5px;
+            margin: 3px 0;
+            background: #f0f0f0;
+            border-radius: 3px;
+            border-left: 3px solid #667eea;
+            padding-left: 8px;
+        }
+
+        .event.start {
+            border-left-color: #4CAF50;
+        }
+
+        .event.complete {
+            border-left-color: #2196F3;
+        }
+
+        .event.error {
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ STT-TTS API</h1>
+        <p class="subtitle">Speech-to-Text & Text-to-Speech Pipeline</p>
+
+        <div class="form-group">
+            <label for="audioFile">📁 Upload Audio File</label>
+            <input type="file" id="audioFile" accept="audio/*" required>
+            <small style="color: #999; display: block; margin-top: 5px;">Supported formats: WAV, MP3, OGG, etc.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="endpoint">🔗 Select Endpoint</label>
+            <select id="endpoint">
+                <option value="/api/process-recording">Standard Response (All Data)</option>
+                <option value="/api/process-recording-stream">Streaming Response (SSE)</option>
+                <option value="/api/process-recording-audio">Base64 Audio Only</option>
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-submit" id="submitBtn" onclick="processRecording()">
+                ▶️ Process Recording
+            </button>
+            <button class="btn-clear" id="clearBtn" onclick="clearForm()">
+                🔄 Clear
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loadingText">Processing...</div>
+        </div>
+
+        <div class="results" id="results">
+            <!-- Results will be inserted here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function processRecording() {
+            const fileInput = document.getElementById('audioFile');
+            const endpoint = document.getElementById('endpoint').value;
+            const resultsDiv = document.getElementById('results');
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+
+            if (!fileInput.files.length) {
+                alert('Please select an audio file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio', fileInput.files[0]);
+
+            resultsDiv.innerHTML = '';
+            resultsDiv.classList.remove('show');
+            loading.classList.add('show');
+            loadingText.textContent = 'Processing...';
+
+            try {
+                if (endpoint === '/api/process-recording-stream') {
+                    // Handle SSE streaming
+                    await handleStreamingResponse(formData);
+                } else {
+                    // Handle standard response
+                    const response = await fetch(`${API_BASE}${endpoint}`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (endpoint === '/api/process-recording-audio') {
+                        displayAudioResults(data);
+                    } else {
+                        displayStandardResults(data);
+                    }
+                }
+
+                loading.classList.remove('show');
+                resultsDiv.classList.add('show');
+            } catch (error) {
+                console.error('Error:', error);
+                loading.classList.remove('show');
+                resultsDiv.innerHTML = `<div class="error-message">❌ Error: ${error.message}</div>`;
+                resultsDiv.classList.add('show');
+            }
+        }
+
+        async function handleStreamingResponse(formData) {
+            const resultsDiv = document.getElementById('results');
+            const loadingText = document.getElementById('loadingText');
+
+            let html = '<div class="result-section">' +
+                '<div class="result-title">📊 Streaming Events</div>' +
+                '<div class="stream-events" id="streamEvents"></div>' +
+                '</div>' +
+                '<div class="result-section">' +
+                '<div class="result-title">🎵 Audio Output</div>' +
+                '<div id="audioContainer"></div>' +
+                '</div>';
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('show');
+
+            const streamEventsDiv = document.getElementById('streamEvents');
+            const audioContainer = document.getElementById('audioContainer');
+            let audioData = '';
+            let eventCount = 0;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/process-recording-stream`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                eventCount++;
+                                loadingText.textContent = `Processing event ${eventCount}...`;
+
+                                let eventHtml = `<div class="event ${data.type || 'info'}">`;
+                                eventHtml += `<strong>[${data.type || 'unknown'}]</strong> `;
+
+                                if (data.type === 'stt_complete') {
+                                    eventHtml += `STT Result: ${data.text}`;
+                                } else if (data.type === 'tts_result') {
+                                    eventHtml += `TTS: Sentence ${data.sentenceIndex + 1} converted`;
+                                    audioData = data.audio; // Store the latest audio
+                                } else if (data.type === 'complete') {
+                                    eventHtml += `✅ Complete! Generated ${data.totalAudios} audio files`;
+                                } else {
+                                    eventHtml += `${data.message || JSON.stringify(data)}`;
+                                }
+
+                                eventHtml += '</div>';
+                                streamEventsDiv.innerHTML += eventHtml;
+                                streamEventsDiv.scrollTop = streamEventsDiv.scrollHeight;
+                            } catch (e) {
+                                console.error('Error parsing event:', e);
+                            }
+                        }
+                    }
+                }
+
+                // Display audio if available
+                if (audioData) {
+                    audioContainer.innerHTML = `
+                        <audio controls style="width: 100%;">
+                            <source src="data:audio/wav;base64,${audioData}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    `;
+                }
+
+                loadingText.textContent = 'Streaming complete!';
+            } catch (error) {
+                console.error('Streaming error:', error);
+                streamEventsDiv.innerHTML += `<div class="event error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function displayStandardResults(data) {
+            const resultsDiv = document.getElementById('results');
+
+            let html = '<div class="success-message">✅ Processing Complete</div>';
+
+            if (data.transcript) {
+                html += `<div class="result-section">
+                    <div class="result-title">📝 Speech-to-Text Result</div>
+                    <div class="result-content">${escapeHtml(data.transcript)}</div>
+                </div>`;
+            }
+
+            if (data.webhookResponse && Array.isArray(data.webhookResponse)) {
+                const webhookText = data.webhookResponse
+                    .filter(r => r.type === 'item')
+                    .map(r => r.content)
+                    .join('');
+                html += `<div class="result-section">
+                    <div class="result-title">🔄 Webhook Response</div>
+                    <div class="result-content">${escapeHtml(webhookText)}</div>
+                </div>`;
+            }
+
+            if (data.sentences && Array.isArray(data.sentences)) {
+                html += `<div class="result-section">
+                    <div class="result-title">✂️ Sentences Split</div>
+                    <div class="result-content">${data.sentences.map((s, i) => `${i + 1}. ${escapeHtml(s)}`).join('<br>')}</div>
+                </div>`;
+            }
+
+            if (data.ttsAudio) {
+                html += `<div class="result-section">
+                    <div class="result-title">🎵 Text-to-Speech Audio</div>
+                    <div class="audio-player">
+                        <audio controls>
+                            <source src="data:audio/wav;base64,${data.ttsAudio}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                </div>`;
+            }
+
+            if (data.ttsAudios && Array.isArray(data.ttsAudios)) {
+                html += `<div class="result-section">
+                    <div class="result-title">🎵 Text-to-Speech Audios (${data.ttsAudios.length} files)</div>`;
+                data.ttsAudios.forEach((audio, index) => {
+                    html += `<div class="audio-player">
+                        <strong>Audio ${index + 1}</strong>
+                        <audio controls>
+                            <source src="data:audio/wav;base64,${audio}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        function displayAudioResults(data) {
+            const resultsDiv = document.getElementById('results');
+
+            let html = '<div class="success-message">✅ Base64 Audio Retrieved</div>';
+
+            html += `<div class="result-section">
+                <div class="result-title">📊 Request Info</div>
+                <div class="result-content">
+                    <strong>Request ID:</strong> ${escapeHtml(data.requestId)}<br>
+                    <strong>Total Audios:</strong> ${data.count}
+                </div>
+            </div>`;
+
+            if (data.ttsBase64) {
+                html += `<div class="result-section">
+                    <div class="result-title">🎵 Combined Audio (Base64)</div>
+                    <div class="audio-player">
+                        <audio controls>
+                            <source src="data:audio/wav;base64,${data.ttsBase64}" type="audio/wav">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; color: #667eea; font-weight: 600;">📋 View Base64 String</summary>
+                        <div class="result-content" style="margin-top: 10px; white-space: pre-wrap; word-break: break-all; font-size: 11px;">
+                            ${escapeHtml(data.ttsBase64.substring(0, 500))}${data.ttsBase64.length > 500 ? '...' : ''}
+                        </div>
+                    </details>
+                </div>`;
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        function clearForm() {
+            document.getElementById('audioFile').value = '';
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Add drag and drop support
+        const fileInput = document.getElementById('audioFile');
+        const container = document.querySelector('.container');
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.style.background = '#f0f0f0';
+        });
+
+        container.addEventListener('dragleave', () => {
+            container.style.background = 'white';
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.style.background = 'white';
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+            }
+        });
+    </script>
+</body>
+</html>
