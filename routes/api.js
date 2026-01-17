@@ -368,24 +368,14 @@ router.post('/process-recording-audio', upload.single('audio'), async (req, res)
 
     console.log(`[${requestId}] Processing complete. Generated ${audios.length} audio files`);
 
-    // Return based on query parameter
-    const format = req.query.format || 'single'; // 'single' or 'multiple'
-
-    if (format === 'single' && audios.length > 0) {
-      // Return only the first audio as single base64
-      return res.status(200).json({
-        success: true,
-        requestId: requestId,
-        ttsBase64: audios[0],
-      });
-    }
-
-    // Return all audios as array
+    // Combine all base64 audios into one complete base64 string
+    const completeBase64 = audios.join('');
+    
     res.status(200).json({
       success: true,
       requestId: requestId,
       count: audios.length,
-      audios: audios,
+      ttsBase64: completeBase64,
     });
 
   } catch (error) {
