@@ -290,6 +290,116 @@ router.post('/process-recording', upload.single('audio'), async (req, res) => {
 });
 
 /**
+ * POST /process-recording-audio
+ * Returns only base64 audio(s) from the complete pipeline
+ * Response format: { audios: [base64_1, base64_2, ...] } or single audio as base64
+ */
+router.post('/process-recording-audio', upload.single('audio'), async (req, res) => {
+  const requestId = uuidv4();
+  
+  try {
+    // Validate file upload
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No audio file provided',
+      });
+    }
+
+    console.log(`\n[${requestId}] Starting audio-only processing...`);
+    console.log(`[${requestId}] Received file: ${req.file.originalname} (${req.file.size} bytes)`);
+
+    // Extract optional parameters
+    const sttOptions = {
+      language_code: req.query.language || req.body.language,
+      model: req.query.sttModel || req.body.sttModel,
+    };
+
+    // Remove undefined options
+    Object.keys(sttOptions).forEach(key => sttOptions[key] === undefined && delete sttOptions[key]);
+
+    // Step 1: Convert audio to text using STT
+    console.log(`[${requestId}] Step 1: Converting audio to text using STT...`);
+    const sttText = await sttService.convertAudioToText(
+      req.file.buffer,
+      req.file.mimetype || 'audio/wav',
+      sttOptions
+    );
+    console.log(`[${requestId}] STT Result: "${sttText}"`);
+
+    // Step 2: Call webhook with streaming response
+    console.log(`[${requestId}] Step 2: Calling webhook with streaming response...`);
+    const webhookResponses = await webhookService.callWebhookStream(sttText, requestId);
+    console.log(`[${requestId}] Webhook returned ${webhookResponses.length} responses`);
+
+    // Step 3: Process webhook responses - accumulate content chunks into complete text
+    console.log(`[${requestId}] Step 3: Accumulating webhook responses into complete text...`);
+    
+    // Extract only 'item' type responses and accumulate content
+    let accumulatedText = '';
+    for (const webhookResponse of webhookResponses) {
+      const content = webhookService.extractTextFromResponse(webhookResponse);
+      if (content) {
+        accumulatedText += content;
+      }
+    }
+
+    console.log(`[${requestId}] Accumulated text: "${accumulatedText}"`);
+
+    // Split accumulated text into sentences for TTS conversion
+    const sentences = webhookService.splitIntoSentences(accumulatedText);
+    console.log(`[${requestId}] Split into ${sentences.length} sentence(s) for TTS conversion`);
+
+    // Convert each sentence to speech and collect base64
+    const audios = [];
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      
+      // Skip very short sentences (single punctuation, etc.)
+      if (sentence.trim().length < 2) {
+        console.log(`[${requestId}] Skipping short sentence: "${sentence}"`);
+        continue;
+      }
+
+      console.log(`[${requestId}] Converting sentence ${i + 1}/${sentences.length}: "${sentence}"`);
+      const ttsBase64 = await ttsService.convertTextToSpeech(sentence);
+      audios.push(ttsBase64);
+    }
+
+    console.log(`[${requestId}] Processing complete. Generated ${audios.length} audio files`);
+
+    // Return based on query parameter
+    const format = req.query.format || 'single'; // 'single' or 'multiple'
+
+    if (format === 'single' && audios.length > 0) {
+      // Return only the first audio as single base64
+      return res.status(200).json({
+        success: true,
+        requestId: requestId,
+        ttsBase64: audios[0],
+      });
+    }
+
+    // Return all audios as array
+    res.status(200).json({
+      success: true,
+      requestId: requestId,
+      count: audios.length,
+      audios: audios,
+    });
+
+  } catch (error) {
+    console.error(`[${requestId}] Error processing recording:`, error.message);
+
+    res.status(500).json({
+      success: false,
+      requestId: requestId,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /health
  * Health check endpoint
  */
