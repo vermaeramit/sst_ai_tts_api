@@ -352,6 +352,8 @@ router.post('/process-recording-audio', upload.single('audio'), async (req, res)
 
     // Convert each sentence to speech and collect binary data
     const audioBuffers = [];
+    let totalAudioSize = 0;
+    
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i];
       
@@ -365,16 +367,70 @@ router.post('/process-recording-audio', upload.single('audio'), async (req, res)
       const ttsBase64 = await ttsService.convertTextToSpeech(sentence);
       
       // Convert base64 to buffer
-      const binaryString = Buffer.from(ttsBase64, 'base64').toString('binary');
-      const buffer = Buffer.from(binaryString, 'binary');
+      const buffer = Buffer.from(ttsBase64, 'base64');
       audioBuffers.push(buffer);
+      totalAudioSize += buffer.length;
     }
 
     console.log(`[${requestId}] Processing complete. Generated ${audioBuffers.length} audio files`);
 
-    // Combine all audio buffers into one
-    const completeBuffer = Buffer.concat(audioBuffers);
-    const completeBase64 = completeBuffer.toString('base64');
+    // Extract audio data from each WAV file and recombine with proper header
+    let combinedAudioData = Buffer.alloc(0);
+    
+    for (const buffer of audioBuffers) {
+      // Find the "data" chunk in WAV file
+      let dataChunkStart = -1;
+      let dataChunkSize = 0;
+      
+      for (let i = 0; i < buffer.length - 8; i++) {
+        // Look for "data" chunk identifier (0x64617461)
+        if (buffer[i] === 0x64 && buffer[i+1] === 0x61 && buffer[i+2] === 0x74 && buffer[i+3] === 0x61) {
+          dataChunkStart = i + 8; // Skip "data" and size fields
+          // Read the size of data chunk (little-endian 32-bit)
+          dataChunkSize = buffer.readUInt32LE(i + 4);
+          break;
+        }
+      }
+      
+      if (dataChunkStart !== -1 && dataChunkSize > 0) {
+        const audioData = buffer.slice(dataChunkStart, dataChunkStart + dataChunkSize);
+        combinedAudioData = Buffer.concat([combinedAudioData, audioData]);
+      }
+    }
+
+    // Create a proper WAV header for the combined audio
+    const sampleRate = 24000; // Sarvam uses 24kHz
+    const numChannels = 1; // Mono
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const dataSize = combinedAudioData.length;
+    const fileSize = 36 + dataSize;
+
+    // Create WAV file
+    const wavBuffer = Buffer.alloc(44 + dataSize);
+    
+    // RIFF header
+    wavBuffer.write('RIFF', 0);
+    wavBuffer.writeUInt32LE(fileSize, 4);
+    wavBuffer.write('WAVE', 8);
+    
+    // fmt sub-chunk
+    wavBuffer.write('fmt ', 12);
+    wavBuffer.writeUInt32LE(16, 16); // Subchunk1Size
+    wavBuffer.writeUInt16LE(1, 20); // AudioFormat (1 = PCM)
+    wavBuffer.writeUInt16LE(numChannels, 22);
+    wavBuffer.writeUInt32LE(sampleRate, 24);
+    wavBuffer.writeUInt32LE(byteRate, 28);
+    wavBuffer.writeUInt16LE(blockAlign, 32);
+    wavBuffer.writeUInt16LE(bitsPerSample, 34);
+    
+    // data sub-chunk
+    wavBuffer.write('data', 36);
+    wavBuffer.writeUInt32LE(dataSize, 40);
+    combinedAudioData.copy(wavBuffer, 44);
+
+    const completeBase64 = wavBuffer.toString('base64');
     
     res.status(200).json({
       success: true,
