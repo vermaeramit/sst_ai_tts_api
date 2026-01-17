@@ -350,8 +350,8 @@ router.post('/process-recording-audio', upload.single('audio'), async (req, res)
     const sentences = webhookService.splitIntoSentences(accumulatedText);
     console.log(`[${requestId}] Split into ${sentences.length} sentence(s) for TTS conversion`);
 
-    // Convert each sentence to speech and collect base64
-    const audios = [];
+    // Convert each sentence to speech and collect binary data
+    const audioBuffers = [];
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i];
       
@@ -363,18 +363,23 @@ router.post('/process-recording-audio', upload.single('audio'), async (req, res)
 
       console.log(`[${requestId}] Converting sentence ${i + 1}/${sentences.length}: "${sentence}"`);
       const ttsBase64 = await ttsService.convertTextToSpeech(sentence);
-      audios.push(ttsBase64);
+      
+      // Convert base64 to buffer
+      const binaryString = Buffer.from(ttsBase64, 'base64').toString('binary');
+      const buffer = Buffer.from(binaryString, 'binary');
+      audioBuffers.push(buffer);
     }
 
-    console.log(`[${requestId}] Processing complete. Generated ${audios.length} audio files`);
+    console.log(`[${requestId}] Processing complete. Generated ${audioBuffers.length} audio files`);
 
-    // Combine all base64 audios into one complete base64 string
-    const completeBase64 = audios.join('');
+    // Combine all audio buffers into one
+    const completeBuffer = Buffer.concat(audioBuffers);
+    const completeBase64 = completeBuffer.toString('base64');
     
     res.status(200).json({
       success: true,
       requestId: requestId,
-      count: audios.length,
+      count: audioBuffers.length,
       ttsBase64: completeBase64,
     });
 

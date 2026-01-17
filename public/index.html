@@ -599,6 +599,9 @@
                     <div class="audio-player">
                         <audio id="audioPlayer" controls style="width: 100%;"></audio>
                     </div>
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button onclick="downloadAudio('${data.ttsBase64}', 'audio.wav')" style="flex: 1; padding: 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">⬇️ Download Audio</button>
+                    </div>
                     <details style="margin-top: 10px;">
                         <summary style="cursor: pointer; color: #667eea; font-weight: 600;">📋 View Base64 String</summary>
                         <div class="result-content" style="margin-top: 10px; white-space: pre-wrap; word-break: break-all; font-size: 11px;">
@@ -657,6 +660,30 @@
                 "'": '&#039;'
             };
             return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function downloadAudio(base64String, filename) {
+            try {
+                const binaryString = atob(base64String);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Error downloading audio: ' + error.message);
+            }
         }
 
         // Add drag and drop support
